@@ -72,11 +72,19 @@ const clearSearchBtn = document.getElementById("clearSearch");
 let DATA = [];
 
 function setHash(path){
-  const p = String(path || "").replace(/^#/, "");
-  location.hash = p.startsWith("/") ? p : ("/" + p);
+  const clean = String(path || "")
+    .replace(/^#/, "")
+    .replace(/^\/+/, "");
+  location.hash = "/" + clean;
 }
 
 function parseHash(){
+  const h = location.hash ? location.hash.slice(1) : "/departments";
+  return h
+    .split("/")
+    .filter(Boolean)
+    .map(decodeURIComponent);
+}
   const h = location.hash ? location.hash.slice(1) : "/departments"; // без "#"
   return (h || "/departments").split("/").filter(Boolean);
 }
@@ -192,7 +200,7 @@ function renderDepartments(filter=""){
   viewEl.innerHTML = `
     <div class="grid">
       ${list.map(d => `
-        <div class="card" onclick="setHash('dept/${d.id}')"
+        <div class="card" onclick="setHash('/dept/${encodeURIComponent(d.id)}')"
           <p class="title">${escapeHtml(d.name)}</p>
           <p class="sub">${escapeHtml(d.description || " ")}</p>
           <span class="tag">Сотрудников: ${d.people.length}</span>
@@ -232,7 +240,7 @@ function renderDept(deptHashId, filter=""){
     ${people.length ? `
       <div class="grid">
         ${people.map(p => `
-          <div class="card" onclick="setHash('person/${dept.id}/${p.id}')"
+          <div class="card" onclick="setHash('/person/${encodeURIComponent(dept.id)}/${encodeURIComponent(p.id)}')"
             <p class="title">${escapeHtml(p.fullName)}</p>
             <p class="sub">${escapeHtml(p.role)}${p.subunit ? ` <span class="muted">· ${escapeHtml(p.subunit)}</span>` : ""}</p>
             <div class="tag">${escapeHtml((p.topics||[]).slice(0,3).join(" · ") || "—")}</div>
@@ -253,7 +261,7 @@ function renderPerson(deptHashId, personId){
 
   crumbsEl.textContent = `/ Отделы / ${dept.name} / ${p.fullName}`;
   backBtn.style.display = "inline-block";
-  backBtn.onclick = () => setHash(`dept/${dept.id}`);
+  backBtn.onclick = () => setHash(`/dept/${encodeURIComponent(dept.id)}`);
 
   const topics = (p.topics || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join(" ");
   viewEl.innerHTML = `
