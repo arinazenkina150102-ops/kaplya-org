@@ -71,8 +71,15 @@ const clearSearchBtn = document.getElementById("clearSearch");
 
 let DATA = [];
 
-function setHash(path){ location.hash = path; }
-function parseHash(){ return (location.hash || "#/departments").replace("#","").split("/").filter(Boolean); }
+function setHash(path){
+  const p = String(path || "").replace(/^#/, "");
+  location.hash = p.startsWith("/") ? p : ("/" + p);
+}
+
+function parseHash(){
+  const h = location.hash ? location.hash.slice(1) : "/departments"; // без "#"
+  return (h || "/departments").split("/").filter(Boolean);
+}
 
 function escapeHtml(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m])); }
 
@@ -185,7 +192,7 @@ function renderDepartments(filter=""){
   viewEl.innerHTML = `
     <div class="grid">
       ${list.map(d => `
-        <div class="card" onclick="setHash('/dept/${d.id}')">
+        <div class="card" onclick="setHash('dept/${d.id}')"
           <p class="title">${escapeHtml(d.name)}</p>
           <p class="sub">${escapeHtml(d.description || " ")}</p>
           <span class="tag">Сотрудников: ${d.people.length}</span>
@@ -225,7 +232,7 @@ function renderDept(deptHashId, filter=""){
     ${people.length ? `
       <div class="grid">
         ${people.map(p => `
-          <div class="card" onclick="setHash('/person/${dept.id}/${p.id}')">
+          <div class="card" onclick="setHash('person/${dept.id}/${p.id}')"
             <p class="title">${escapeHtml(p.fullName)}</p>
             <p class="sub">${escapeHtml(p.role)}${p.subunit ? ` <span class="muted">· ${escapeHtml(p.subunit)}</span>` : ""}</p>
             <div class="tag">${escapeHtml((p.topics||[]).slice(0,3).join(" · ") || "—")}</div>
@@ -246,7 +253,7 @@ function renderPerson(deptHashId, personId){
 
   crumbsEl.textContent = `/ Отделы / ${dept.name} / ${p.fullName}`;
   backBtn.style.display = "inline-block";
-  backBtn.onclick = () => setHash(`/dept/${dept.id}`);
+  backBtn.onclick = () => setHash(`dept/${dept.id}`);
 
   const topics = (p.topics || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join(" ");
   viewEl.innerHTML = `
