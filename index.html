@@ -79,7 +79,13 @@ function escapeHtml(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({ "&":"
 function groupByDept(rows){
   const map = new Map();
   for(const r of rows){
-    const dept = (r["Отдел"] || "Прочее").trim();
+const rawDept = (r["Отдел"] || "").trim();
+
+// если "отдел" выглядит как телефон (только цифры/пробелы/запятые/+/-/скобки) — пропускаем строку
+const looksLikePhone = rawDept && /^[0-9\s,+\-()]+$/.test(rawDept.replace(/\u00A0/g, " "));
+if (looksLikePhone) continue;
+
+const dept = rawDept || "Прочее";
     const sub = (r["Подразделение"] || "").trim();
     const key = dept;
     if(!map.has(key)) map.set(key, { id: slug(key), name: key, description: "", people: []});
