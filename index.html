@@ -1,278 +1,309 @@
-<script>
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT0X2z7-H5MM3arEVrYh0wuBiNfpphFa3ebyXu8KouT48l2egq-kctEXDCFtUbGVg/pub?gid=1412005436&single=true&output=csv";
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Оргструктура — Капля</title>
+  <link rel="stylesheet" href="styles.css"> <!-- если есть стили -->
+</head>
+<body>
+  <!-- Навигация -->
+  <header>
+    <div id="crumbs"></div>
+    <button id="backBtn">Назад</button>
+    <button id="homeBtn">На главную</button>
+  </header>
 
-const viewEl = document.getElementById("view");
-const crumbsEl = document.getElementById("crumbs");
-const backBtn = document.getElementById("backBtn");
-const homeBtn = document.getElementById("homeBtn");
-const searchEl = document.getElementById("search");
-const clearSearchBtn = document.getElementById("clearSearch");
+  <!-- Основная часть -->
+  <main>
+    <!-- Поиск -->
+    <input type="search" id="search" placeholder="Поиск: отдел, ФИО, должность, вопросы..." />
+    <button id="clearSearch">Очистить</button>
 
-let DATA = [];
+    <!-- Контейнер для отображения данных -->
+    <section id="view"></section>
+  </main>
 
-function showError(msg){
-  viewEl.innerHTML = `<div class="empty"><b>Ошибка</b><br><br>${escapeHtml(msg)}</div>`;
-}
+  <!-- Подключаем JavaScript -->
+  <script>
+    // Здесь твой JS код, который ты прислал
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT0X2z7-H5MM3arEVrYh0wuBiNfpphFa3ebyXu8KouT48l2egq-kctEXDCFtUbGVg/pub?gid=1412005436&single=true&output=csv";
 
-window.addEventListener("error", (e) => {
-  showError(e.message || "Неизвестная ошибка JS");
-});
+    const viewEl = document.getElementById("view");
+    const crumbsEl = document.getElementById("crumbs");
+    const backBtn = document.getElementById("backBtn");
+    const homeBtn = document.getElementById("homeBtn");
+    const searchEl = document.getElementById("search");
+    const clearSearchBtn = document.getElementById("clearSearch");
 
-function setHash(path){
-  // path: "departments" | "dept/<id>" | "person/<deptId>/<personId>"
-  const clean = String(path || "").replace(/^#/, "").replace(/^\/+/, "");
-  location.hash = "/" + clean;
-}
+    let DATA = [];
 
-function parseHash(){
-  const h = location.hash ? location.hash.slice(1) : "/departments"; // remove "#"
-  return (h || "/departments")
-    .split("/")
-    .filter(Boolean)
-    .map(decodeURIComponent);
-}
-
-function escapeHtml(s){
-  return String(s ?? "").replace(/[&<>"']/g, m => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-  }[m]));
-}
-
-function splitTopics(s){
-  return String(s||"")
-    .split(",")
-    .map(x=>x.trim())
-    .filter(Boolean)
-    .slice(0, 20);
-}
-
-function slug(s){
-  return String(s||"").toLowerCase()
-    .replace(/ё/g,"е")
-    .replace(/[^a-zа-я0-9]+/g,"-")
-    .replace(/^-+|-+$/g,"")
-    .slice(0, 80) || "item";
-}
-
-function looksLikePhone(s){
-  const t = String(s||"").replace(/\u00A0/g," ").trim();
-  return t && /^[0-9\s,+\-()]+$/.test(t) && !/[a-zа-я]/i.test(t);
-}
-
-function groupByDept(rows){
-  const map = new Map();
-
-  for(const r of rows){
-    const rawDept = (r["Отдел"] || "").trim();
-    if(!rawDept) continue;
-
-    // фильтруем "отделы", которые на самом деле телефоны
-    if (looksLikePhone(rawDept)) continue;
-
-    const deptName = rawDept;
-    const sub = (r["Подразделение"] || "").trim();
-    const key = deptName;
-
-    if(!map.has(key)) map.set(key, { id: slug(key), name: key, description: "", people: []});
-    const node = map.get(key);
-
-    node.people.push({
-      id: slug((r["ФИО"]||"") + "_" + (r["Должность"]||"")),
-      fullName: (r["ФИО"]||"").trim(),
-      role: (r["Должность"]||"").trim(),
-      email: (r["Email"]||"").trim(),
-      phoneCorp: (r["Телефон_корп"] || "").toString().replace(/\D/g, ''), // Телефон в текст
-      phonePersonal: (r["Телефон_личный"] || "").toString().replace(/\D/g, ''),
-      extension: (r["Добавочный номер"] || "").trim(),
-      location: (r["Локация"] || "").trim() || "Не указано", // Замена пустых значений
-      topics: splitTopics(r["Вопросы"] || "Не указано"),
-      subunit: sub
-    });
-  }
-
-  return Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-}
-
-async function loadCSV(){
-  try{
-    if(!CSV_URL) { showError("Не указана CSV_URL"); return; }
-    const res = await fetch(CSV_URL, { cache: "no-store" });
-    const text = await res.text();
-    const rows = parseCSV(text);
-
-    DATA = groupByDept(rows);
-    render();
-  }catch(err){
-    showError(err?.message || String(err));
-  }
-}
-
-function parseCSV(text){
-  // минимальный CSV парсер с учетом кавычек
-  const rows=[];
-  const lines = text.replace(/\r/g,"").split("\n").filter(l=>l.length);
-  if(!lines.length) return rows;
-
-  const header = splitCSVLine(lines[0]).map(h=>h.trim());
-  for(let i=1;i<lines.length;i++){
-    const cols = splitCSVLine(lines[i]);
-    const obj={};
-    header.forEach((h,idx)=>obj[h]=cols[idx] ?? "");
-    rows.push(obj);
-  }
-  return rows;
-}
-
-function splitCSVLine(line){
-  const out=[]; let cur=""; let inQ=false;
-  for(let i=0;i<line.length;i++){
-    const ch=line[i];
-    if(ch === '"'){
-      if(inQ && line[i+1] === '"'){ cur+='"'; i++; }
-      else inQ = !inQ;
-    } else if(ch === "," && !inQ){
-      out.push(cur); cur="";
-    } else {
-      cur+=ch;
+    function showError(msg){
+      viewEl.innerHTML = `<div class="empty"><b>Ошибка</b><br><br>${escapeHtml(msg)}</div>`;
     }
-  }
-  out.push(cur);
-  return out;
-}
 
-function findDeptByHashId(deptHashId){ return DATA.find(d => d.id === deptHashId); }
-function findPerson(deptHashId, personId){
-  const dept = findDeptByHashId(deptHashId);
-  if(!dept) return null;
-  return dept.people.find(p => p.id === personId);
-}
+    window.addEventListener("error", (e) => {
+      showError(e.message || "Неизвестная ошибка JS");
+    });
 
-function renderDepartments(filter=""){
-  const q = filter.trim().toLowerCase();
-  const list = DATA.filter(d => {
-    const deptText = `${d.name} ${d.description}`.toLowerCase();
-    const peopleText = d.people.map(p => `${p.fullName} ${p.role} ${(p.topics||[]).join(" ")} ${p.subunit||""}`).join(" ").toLowerCase();
-    return !q || deptText.includes(q) || peopleText.includes(q);
-  });
+    function setHash(path){
+      // path: "departments" | "dept/<id>" | "person/<deptId>/<personId>"
+      const clean = String(path || "").replace(/^#/, "").replace(/^\/+/, "");
+      location.hash = "/" + clean;
+    }
 
-  crumbsEl.textContent = "/ Отделы";
-  backBtn.style.display = "none";
+    function parseHash(){
+      const h = location.hash ? location.hash.slice(1) : "/departments"; // remove "#"
+      return (h || "/departments")
+        .split("/")
+        .filter(Boolean)
+        .map(decodeURIComponent);
+    }
 
-  if(list.length === 0){
-    viewEl.innerHTML = `<div class="empty">Ничего не найдено. Попробуй другой запрос.</div>`;
-    return;
-  }
+    function escapeHtml(s){
+      return String(s ?? "").replace(/[&<>"']/g, m => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[m]));
+    }
 
-  viewEl.innerHTML = `
-    <div class="grid">
-      ${list.map(d => `
-        <div class="card" onclick="setHash('dept/${encodeURIComponent(d.id)}')">
-          <p class="title">${escapeHtml(d.name)}</p>
-          <p class="sub">${escapeHtml(d.description || " ")}</p>
-          <span class="tag">Сотрудников: ${d.people.length}</span>
+    function splitTopics(s){
+      return String(s||"")
+        .split(",")
+        .map(x=>x.trim())
+        .filter(Boolean)
+        .slice(0, 20);
+    }
+
+    function slug(s){
+      return String(s||"").toLowerCase()
+        .replace(/ё/g,"е")
+        .replace(/[^a-zа-я0-9]+/g,"-")
+        .replace(/^-+|-+$/g,"")
+        .slice(0, 80) || "item";
+    }
+
+    function looksLikePhone(s){
+      const t = String(s||"").replace(/\u00A0/g," ").trim();
+      return t && /^[0-9\s,+\-()]+$/.test(t) && !/[a-zа-я]/i.test(t);
+    }
+
+    function groupByDept(rows){
+      const map = new Map();
+
+      for(const r of rows){
+        const rawDept = (r["Отдел"] || "").trim();
+        if(!rawDept) continue;
+
+        // фильтруем "отделы", которые на самом деле телефоны
+        if (looksLikePhone(rawDept)) continue;
+
+        const deptName = rawDept;
+        const sub = (r["Подразделение"] || "").trim();
+        const key = deptName;
+
+        if(!map.has(key)) map.set(key, { id: slug(key), name: key, description: "", people: []});
+        const node = map.get(key);
+
+        node.people.push({
+          id: slug((r["ФИО"]||"") + "_" + (r["Должность"]||"")),
+          fullName: (r["ФИО"]||"").trim(),
+          role: (r["Должность"]||"").trim(),
+          email: (r["Email"]||"").trim(),
+          phoneCorp: (r["Телефон_корп"] || "").toString().replace(/\D/g, ''), // Телефон в текст
+          phonePersonal: (r["Телефон_личный"] || "").toString().replace(/\D/g, ''),
+          extension: (r["Добавочный номер"] || "").trim(),
+          location: (r["Локация"] || "").trim() || "Не указано", // Замена пустых значений
+          topics: splitTopics(r["Вопросы"] || "Не указано"),
+          subunit: sub
+        });
+      }
+
+      return Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+    }
+
+    async function loadCSV(){
+      try{
+        if(!CSV_URL) { showError("Не указана CSV_URL"); return; }
+        const res = await fetch(CSV_URL, { cache: "no-store" });
+        const text = await res.text();
+        const rows = parseCSV(text);
+
+        DATA = groupByDept(rows);
+        render();
+      }catch(err){
+        showError(err?.message || String(err));
+      }
+    }
+
+    function parseCSV(text){
+      // минимальный CSV парсер с учетом кавычек
+      const rows=[];
+      const lines = text.replace(/\r/g,"").split("\n").filter(l=>l.length);
+      if(!lines.length) return rows;
+
+      const header = splitCSVLine(lines[0]).map(h=>h.trim());
+      for(let i=1;i<lines.length;i++){
+        const cols = splitCSVLine(lines[i]);
+        const obj={};
+        header.forEach((h,idx)=>obj[h]=cols[idx] ?? "");
+        rows.push(obj);
+      }
+      return rows;
+    }
+
+    function splitCSVLine(line){
+      const out=[]; let cur=""; let inQ=false;
+      for(let i=0;i<line.length;i++){
+        const ch=line[i];
+        if(ch === '"'){
+          if(inQ && line[i+1] === '"'){ cur+='"'; i++; }
+          else inQ = !inQ;
+        } else if(ch === "," && !inQ){
+          out.push(cur); cur="";
+        } else {
+          cur+=ch;
+        }
+      }
+      out.push(cur);
+      return out;
+    }
+
+    function findDeptByHashId(deptHashId){ return DATA.find(d => d.id === deptHashId); }
+    function findPerson(deptHashId, personId){
+      const dept = findDeptByHashId(deptHashId);
+      if(!dept) return null;
+      return dept.people.find(p => p.id === personId);
+    }
+
+    function renderDepartments(filter=""){
+      const q = filter.trim().toLowerCase();
+      const list = DATA.filter(d => {
+        const deptText = `${d.name} ${d.description}`.toLowerCase();
+        const peopleText = d.people.map(p => `${p.fullName} ${p.role} ${(p.topics||[]).join(" ")} ${p.subunit||""}`).join(" ").toLowerCase();
+        return !q || deptText.includes(q) || peopleText.includes(q);
+      });
+
+      crumbsEl.textContent = "/ Отделы";
+      backBtn.style.display = "none";
+
+      if(list.length === 0){
+        viewEl.innerHTML = `<div class="empty">Ничего не найдено. Попробуй другой запрос.</div>`;
+        return;
+      }
+
+      viewEl.innerHTML = `
+        <div class="grid">
+          ${list.map(d => `
+            <div class="card" onclick="setHash('dept/${encodeURIComponent(d.id)}')">
+              <p class="title">${escapeHtml(d.name)}</p>
+              <p class="sub">${escapeHtml(d.description || " ")}</p>
+              <span class="tag">Сотрудников: ${d.people.length}</span>
+            </div>
+          `).join("")}
         </div>
-      `).join("")}
-    </div>
-  `;
-}
+      `;
+    }
 
-function renderDept(deptHashId, filter=""){
-  const dept = findDeptByHashId(deptHashId);
-  if(!dept){
-    viewEl.innerHTML = `<div class="empty">Отдел не найден.</div>`;
-    return;
-  }
+    function renderDept(deptHashId, filter=""){
+      const dept = findDeptByHashId(deptHashId);
+      if(!dept){
+        viewEl.innerHTML = `<div class="empty">Отдел не найден.</div>`;
+        return;
+      }
 
-  const q = filter.trim().toLowerCase();
-  const people = dept.people.filter(p => {
-    const text = `${p.fullName} ${p.role} ${(p.topics||[]).join(" ")} ${p.subunit||""}`.toLowerCase();
-    return !q || text.includes(q);
-  });
+      const q = filter.trim().toLowerCase();
+      const people = dept.people.filter(p => {
+        const text = `${p.fullName} ${p.role} ${(p.topics||[]).join(" ")} ${p.subunit||""}`.toLowerCase();
+        return !q || text.includes(q);
+      });
 
-  crumbsEl.textContent = `/ Отделы / ${dept.name}`;
-  backBtn.style.display = "inline-block";
-  backBtn.onclick = () => setHash("departments");
+      crumbsEl.textContent = `/ Отделы / ${dept.name}`;
+      backBtn.style.display = "inline-block";
+      backBtn.onclick = () => setHash("departments");
 
-  viewEl.innerHTML = `
-    <div class="panel" style="margin-bottom:12px">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <p class="title" style="margin:0 0 6px">${escapeHtml(dept.name)}</p>
-          <p class="sub" style="margin:0">${escapeHtml(dept.description || "")}</p>
-        </div>
-        <span class="tag">Сотрудников: ${dept.people.length}</span>
-      </div>
-    </div>
-
-    ${people.length ? `
-      <div class="grid">
-        ${people.map(p => `
-          <div class="card" onclick="setHash('person/${encodeURIComponent(dept.id)}/${encodeURIComponent(p.id)}')">
-            <p class="title">${escapeHtml(p.fullName)}</p>
-            <p class="sub">${escapeHtml(p.role)}${p.subunit ? ` <span class="muted">· ${escapeHtml(p.subunit)}</span>` : ""}</p>
-            <div class="tag">${escapeHtml((p.topics||[]).slice(0,3).join(" · ") || "—")}</div>
+      viewEl.innerHTML = `
+        <div class="panel" style="margin-bottom:12px">
+          <div class="row" style="justify-content:space-between">
+            <div>
+              <p class="title" style="margin:0 0 6px">${escapeHtml(dept.name)}</p>
+              <p class="sub" style="margin:0">${escapeHtml(dept.description || "")}</p>
+            </div>
+            <span class="tag">Сотрудников: ${dept.people.length}</span>
           </div>
-        `).join("")}
-      </div>
-    ` : `<div class="empty">В этом отделе по текущему поиску никого не найдено.</div>`}
-  `;
-}
-
-function renderPerson(deptHashId, personId){
-  const dept = findDeptByHashId(deptHashId);
-  const p = findPerson(deptHashId, personId);
-  if(!dept || !p){
-    viewEl.innerHTML = `<div class="empty">Сотрудник не найден.</div>`;
-    return;
-  }
-
-  crumbsEl.textContent = `/ Отделы / ${dept.name} / ${p.fullName}`;
-  backBtn.style.display = "inline-block";
-  backBtn.onclick = () => setHash(`dept/${encodeURIComponent(dept.id)}`);
-
-  const topics = (p.topics || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join(" ");
-
-  viewEl.innerHTML = `
-    <div class="two">
-      <div class="panel">
-        <p class="title" style="margin-top:0">${escapeHtml(p.fullName)}</p>
-        <p class="sub">${escapeHtml(p.role)} <span class="muted">· ${escapeHtml(dept.name)}${p.subunit ? " / " + escapeHtml(p.subunit) : ""}</span></p>
-
-        <div style="margin:14px 0 10px" class="kv">
-          <div><div class="k">Email</div><div class="v">${p.email ? `<a href="mailto:${escapeHtml(p.email)}">${escapeHtml(p.email)}</a>` : "—"}</div></div>
-          <div><div class="k">Корп.</div><div class="v">${p.phoneCorp ? `<a href="tel:${escapeHtml(p.phoneCorp)}">${escapeHtml(p.phoneCorp)}</a>` : "—"}</div></div>
-          <div><div class="k">Личный</div><div class="v">${p.phonePersonal ? `<a href="tel:${escapeHtml(p.phonePersonal)}">${escapeHtml(p.phonePersonal)}</a>` : "—"}</div></div>
-          <div><div class="k">Локация</div><div class="v">${escapeHtml(p.location || "—")}</div></div>
-          <div><div class="k">Добавочный номер</div><div class="v">${escapeHtml(p.extension || "—")}</div></div>
         </div>
-      </div>
 
-      <div class="panel">
-        <p class="title" style="margin-top:0; font-size:16px">По каким вопросам обращаться</p>
-        <div class="row" style="gap:8px; flex-wrap:wrap">
-          ${topics || `<span class="muted">—</span>`}
+        ${people.length ? `
+          <div class="grid">
+            ${people.map(p => `
+              <div class="card" onclick="setHash('person/${encodeURIComponent(dept.id)}/${encodeURIComponent(p.id)}')">
+                <p class="title">${escapeHtml(p.fullName)}</p>
+                <p class="sub">${escapeHtml(p.role)}${p.subunit ? ` <span class="muted">· ${escapeHtml(p.subunit)}</span>` : ""}</p>
+                <div class="tag">${escapeHtml((p.topics||[]).slice(0,3).join(" · ") || "—")}</div>
+              </div>
+            `).join("")}
+          </div>
+        ` : `<div class="empty">В этом отделе по текущему поиску никого не найдено.</div>`}
+      `;
+    }
+
+    function renderPerson(deptHashId, personId){
+      const dept = findDeptByHashId(deptHashId);
+      const p = findPerson(deptHashId, personId);
+      if(!dept || !p){
+        viewEl.innerHTML = `<div class="empty">Сотрудник не найден.</div>`;
+        return;
+      }
+
+      crumbsEl.textContent = `/ Отделы / ${dept.name} / ${p.fullName}`;
+      backBtn.style.display = "inline-block";
+      backBtn.onclick = () => setHash(`dept/${encodeURIComponent(dept.id)}`);
+
+      const topics = (p.topics || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join(" ");
+
+      viewEl.innerHTML = `
+        <div class="two">
+          <div class="panel">
+            <p class="title" style="margin-top:0">${escapeHtml(p.fullName)}</p>
+            <p class="sub">${escapeHtml(p.role)} <span class="muted">· ${escapeHtml(dept.name)}${p.subunit ? " / " + escapeHtml(p.subunit) : ""}</span></p>
+
+            <div style="margin:14px 0 10px" class="kv">
+              <div><div class="k">Email</div><div class="v">${p.email ? `<a href="mailto:${escapeHtml(p.email)}">${escapeHtml(p.email)}</a>` : "—"}</div></div>
+              <div><div class="k">Корп.</div><div class="v">${p.phoneCorp ? `<a href="tel:${escapeHtml(p.phoneCorp)}">${escapeHtml(p.phoneCorp)}</a>` : "—"}</div></div>
+              <div><div class="k">Личный</div><div class="v">${p.phonePersonal ? `<a href="tel:${escapeHtml(p.phonePersonal)}">${escapeHtml(p.phonePersonal)}</a>` : "—"}</div></div>
+              <div><div class="k">Локация</div><div class="v">${escapeHtml(p.location || "—")}</div></div>
+              <div><div class="k">Добавочный номер</div><div class="v">${escapeHtml(p.extension || "—")}</div></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="title" style="margin-top:0; font-size:16px">По каким вопросам обращаться</p>
+            <div class="row" style="gap:8px; flex-wrap:wrap">
+              ${topics || `<span class="muted">—</span>`}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  `;
-}
+      `;
+    }
 
-function render(){
-  const parts = parseHash();
-  const q = searchEl.value || "";
+    function render(){
+      const parts = parseHash();
+      const q = searchEl.value || "";
 
-  if(parts.length === 1 && parts[0] === "departments"){ renderDepartments(q); return; }
-  if(parts.length === 2 && parts[0] === "dept"){ renderDept(parts[1], q); return; }
-  if(parts.length === 3 && parts[0] === "person"){ renderPerson(parts[1], parts[2]); return; }
+      if(parts.length === 1 && parts[0] === "departments"){ renderDepartments(q); return; }
+      if(parts.length === 2 && parts[0] === "dept"){ renderDept(parts[1], q); return; }
+      if(parts.length === 3 && parts[0] === "person"){ renderPerson(parts[1], parts[2]); return; }
 
-  setHash("departments");
-}
+      setHash("departments");
+    }
 
-homeBtn.onclick = () => setHash("departments");
-searchEl.addEventListener("input", () => render());
-clearSearchBtn.onclick = () => { searchEl.value = ""; render(); };
-window.addEventListener("hashchange", () => render());
+    homeBtn.onclick = () => setHash("departments");
+    searchEl.addEventListener("input", () => render());
+    clearSearchBtn.onclick = () => { searchEl.value = ""; render(); };
+    window.addEventListener("hashchange", () => render());
 
-if(!location.hash) setHash("departments");
-loadCSV();
-</script>
+    if(!location.hash) setHash("departments");
+    loadCSV();
+  </script>
+</body>
+</html>
+
