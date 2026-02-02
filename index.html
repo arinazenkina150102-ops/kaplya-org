@@ -125,6 +125,7 @@
 
   <!-- Подключаем JavaScript -->
   <script>
+  document.addEventListener("DOMContentLoaded", function () {
     const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT0X2z7-H5MM3arEVrYh0wuBiNfpphFa3ebyXu8KouT48l2egq-kctEXDCFtUbGVg/pub?gid=1412005436&single=true&output=csv";
 
     const viewEl = document.getElementById("view");
@@ -316,7 +317,8 @@
 
     if(!location.hash) setHash("departments");
     loadCSV();
-  </script>
-
+  });
+</script>
 </body>
 </html>
+
