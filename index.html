@@ -1,66 +1,5 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Оргнавигация — Капля</title>
-  <style>
-    :root{--bg:#0b1020;--card:#121a33;--card2:#0f1630;--text:#e9edff;--muted:#aab3dd;--accent:#7aa2ff;--border:rgba(255,255,255,.08)}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0b1020 0%,#070a14 100%);color:var(--text)}
-    header{position:sticky;top:0;backdrop-filter:blur(10px);background:rgba(11,16,32,.65);border-bottom:1px solid var(--border);padding:14px 18px;z-index:10}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .brand{font-weight:700}
-    .crumbs{color:var(--muted);font-size:14px}
-    .btn{border:1px solid var(--border);background:transparent;color:var(--text);padding:8px 10px;border-radius:10px;cursor:pointer}
-    .btn:hover{border-color:rgba(122,162,255,.55)}
-    .wrap{max-width:1100px;margin:0 auto;padding:18px}
-    .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 18px}
-    input[type="search"]{flex:1;min-width:240px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:12px;outline:none}
-    input[type="search"]::placeholder{color:rgba(233,237,255,.55)}
-    .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
-    .card{background:linear-gradient(180deg,var(--card) 0%,var(--card2) 100%);border:1px solid var(--border);border-radius:16px;padding:14px;cursor:pointer;transition:transform .08s ease,border-color .08s ease}
-    .card:hover{transform:translateY(-2px);border-color:rgba(122,162,255,.55)}
-    .title{font-weight:650;margin:0 0 6px}
-    .sub{color:var(--muted);font-size:14px;margin:0}
-    .tag{display:inline-block;margin-top:10px;font-size:12px;color:rgba(233,237,255,.85);padding:4px 8px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.03)}
-    .panel{border:1px solid var(--border);border-radius:18px;padding:16px;background:rgba(255,255,255,.03)}
-    .two{display:grid;gap:14px;grid-template-columns:1.1fr .9fr}
-    @media(max-width:860px){.two{grid-template-columns:1fr}}
-    .kv{display:grid;gap:8px}
-    .kv div{display:flex;gap:10px;align-items:flex-start}
-    .k{min-width:110px;color:var(--muted);font-size:13px}
-    .v{font-size:14px}
-    a{color:var(--accent);text-decoration:none}
-    a:hover{text-decoration:underline}
-    .muted{color:var(--muted)}
-    .empty{padding:18px;color:var(--muted);border:1px dashed var(--border);border-radius:16px}
-  </style>
-</head>
-<body>
-<header>
-  <div class="row" style="justify-content:space-between">
-    <div class="row">
-      <div class="brand">Оргструктура</div>
-      <div class="crumbs" id="crumbs">/ Отделы</div>
-    </div>
-    <div class="row">
-      <button class="btn" id="backBtn" style="display:none">Назад</button>
-      <button class="btn" id="homeBtn">На главную</button>
-    </div>
-  </div>
-</header>
-
-<main class="wrap">
-  <div class="toolbar">
-    <input id="search" type="search" placeholder="Поиск: отдел, ФИО, должность, вопросы…" />
-    <button class="btn" id="clearSearch">Очистить</button>
-  </div>
-  <section id="view"></section>
-</main>
-
 <script>
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrXU5-0CFLuupO7YFEbF6yIBXhbfVxs10GgUT2VhHpf28_sn_6LcVUo88H2FjC6rl8Oe3n0KjB8r5N/pub?gid=756767164&single=true&output=csv";
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrXU5-0CFLuupO7YFEbF6yIBXhbfVxs10GgUT2VhHpf28_sn_6LcVUo88H2FjC6rl8Oe3n0KjB8r5N/export?format=csv&gid=756767164";
 
 const viewEl = document.getElementById("view");
 const crumbsEl = document.getElementById("crumbs");
@@ -71,53 +10,32 @@ const clearSearchBtn = document.getElementById("clearSearch");
 
 let DATA = [];
 
+function showError(msg){
+  viewEl.innerHTML = `<div class="empty"><b>Ошибка</b><br><br>${escapeHtml(msg)}</div>`;
+}
+
+window.addEventListener("error", (e) => {
+  showError(e.message || "Неизвестная ошибка JS");
+});
+
 function setHash(path){
-  const clean = String(path || "")
-    .replace(/^#/, "")
-    .replace(/^\/+/, "");
+  // path: "departments" | "dept/<id>" | "person/<deptId>/<personId>"
+  const clean = String(path || "").replace(/^#/, "").replace(/^\/+/, "");
   location.hash = "/" + clean;
 }
 
 function parseHash(){
-  const h = location.hash ? location.hash.slice(1) : "/departments";
-  return h
+  const h = location.hash ? location.hash.slice(1) : "/departments"; // remove "#"
+  return (h || "/departments")
     .split("/")
     .filter(Boolean)
     .map(decodeURIComponent);
 }
-  const h = location.hash ? location.hash.slice(1) : "/departments"; // без "#"
-  return (h || "/departments").split("/").filter(Boolean);
-}
 
-function escapeHtml(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m])); }
-
-function groupByDept(rows){
-  const map = new Map();
-  for(const r of rows){
-const rawDept = (r["Отдел"] || "").trim();
-
-// если "отдел" выглядит как телефон (только цифры/пробелы/запятые/+/-/скобки) — пропускаем строку
-const looksLikePhone = rawDept && /^[0-9\s,+\-()]+$/.test(rawDept.replace(/\u00A0/g, " "));
-if (looksLikePhone) continue;
-
-const dept = rawDept || "Прочее";
-    const sub = (r["Подразделение"] || "").trim();
-    const key = dept;
-    if(!map.has(key)) map.set(key, { id: slug(key), name: key, description: "", people: []});
-    const node = map.get(key);
-    node.people.push({
-      id: slug((r["ФИО"]||"") + "_" + (r["Должность"]||"")),
-      fullName: (r["ФИО"]||"").trim(),
-      role: (r["Должность"]||"").trim(),
-      email: (r["Email"]||"").trim(),
-      phoneCorp: (r["Телефон_корп"]||"").trim(),
-      phonePersonal: (r["Телефон_личный"]||"").trim(),
-      location: (r["Локация"]||"").trim(),
-      topics: splitTopics(r["Вопросы"]||""),
-      subunit: sub
-    });
-  }
-  return Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[m]));
 }
 
 function splitTopics(s){
@@ -136,18 +54,65 @@ function slug(s){
     .slice(0, 80) || "item";
 }
 
+function looksLikePhone(s){
+  const t = String(s||"").replace(/\u00A0/g," ").trim();
+  return t && /^[0-9\s,+\-()]+$/.test(t) && !/[a-zа-я]/i.test(t);
+}
+
+function groupByDept(rows){
+  const map = new Map();
+
+  for(const r of rows){
+    const rawDept = (r["Отдел"] || "").trim();
+    if(!rawDept) continue;
+
+    // фильтруем "отделы", которые на самом деле телефоны
+    if (looksLikePhone(rawDept)) continue;
+
+    const deptName = rawDept;
+    const sub = (r["Подразделение"] || "").trim();
+    const key = deptName;
+
+    if(!map.has(key)) map.set(key, { id: slug(key), name: key, description: "", people: []});
+    const node = map.get(key);
+
+    node.people.push({
+      id: slug((r["ФИО"]||"") + "_" + (r["Должность"]||"")),
+      fullName: (r["ФИО"]||"").trim(),
+      role: (r["Должность"]||"").trim(),
+      email: (r["Email"]||"").trim(),
+      phoneCorp: (r["Телефон_корп"] || "").toString().replace(/\D/g, ''), // Телефон в текст
+      phonePersonal: (r["Телефон_личный"] || "").toString().replace(/\D/g, ''),
+      extension: (r["Добавочный номер"] || "").trim(),
+      location: (r["Локация"] || "").trim() || "Не указано", // Замена пустых значений
+      topics: splitTopics(r["Вопросы"] || "Не указано"),
+      subunit: sub
+    });
+  }
+
+  return Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+}
+
 async function loadCSV(){
-  const res = await fetch(CSV_URL, { cache: "no-store" });
-  const text = await res.text();
-  const rows = parseCSV(text);
-  DATA = groupByDept(rows);
-  render();
+  try{
+    if(!CSV_URL) { showError("Не указана CSV_URL"); return; }
+    const res = await fetch(CSV_URL, { cache: "no-store" });
+    const text = await res.text();
+    const rows = parseCSV(text);
+
+    DATA = groupByDept(rows);
+    render();
+  }catch(err){
+    showError(err?.message || String(err));
+  }
 }
 
 function parseCSV(text){
+  // минимальный CSV парсер с учетом кавычек
   const rows=[];
   const lines = text.replace(/\r/g,"").split("\n").filter(l=>l.length);
   if(!lines.length) return rows;
+
   const header = splitCSVLine(lines[0]).map(h=>h.trim());
   for(let i=1;i<lines.length;i++){
     const cols = splitCSVLine(lines[i]);
@@ -157,11 +122,12 @@ function parseCSV(text){
   }
   return rows;
 }
+
 function splitCSVLine(line){
   const out=[]; let cur=""; let inQ=false;
   for(let i=0;i<line.length;i++){
     const ch=line[i];
-    if(ch === '"' ){
+    if(ch === '"'){
       if(inQ && line[i+1] === '"'){ cur+='"'; i++; }
       else inQ = !inQ;
     } else if(ch === "," && !inQ){
@@ -200,7 +166,7 @@ function renderDepartments(filter=""){
   viewEl.innerHTML = `
     <div class="grid">
       ${list.map(d => `
-        <div class="card" onclick="setHash('/dept/${encodeURIComponent(d.id)}')"
+        <div class="card" onclick="setHash('dept/${encodeURIComponent(d.id)}')">
           <p class="title">${escapeHtml(d.name)}</p>
           <p class="sub">${escapeHtml(d.description || " ")}</p>
           <span class="tag">Сотрудников: ${d.people.length}</span>
@@ -216,6 +182,7 @@ function renderDept(deptHashId, filter=""){
     viewEl.innerHTML = `<div class="empty">Отдел не найден.</div>`;
     return;
   }
+
   const q = filter.trim().toLowerCase();
   const people = dept.people.filter(p => {
     const text = `${p.fullName} ${p.role} ${(p.topics||[]).join(" ")} ${p.subunit||""}`.toLowerCase();
@@ -224,7 +191,7 @@ function renderDept(deptHashId, filter=""){
 
   crumbsEl.textContent = `/ Отделы / ${dept.name}`;
   backBtn.style.display = "inline-block";
-  backBtn.onclick = () => setHash("/departments");
+  backBtn.onclick = () => setHash("departments");
 
   viewEl.innerHTML = `
     <div class="panel" style="margin-bottom:12px">
@@ -240,7 +207,7 @@ function renderDept(deptHashId, filter=""){
     ${people.length ? `
       <div class="grid">
         ${people.map(p => `
-          <div class="card" onclick="setHash('/person/${encodeURIComponent(dept.id)}/${encodeURIComponent(p.id)}')"
+          <div class="card" onclick="setHash('person/${encodeURIComponent(dept.id)}/${encodeURIComponent(p.id)}')">
             <p class="title">${escapeHtml(p.fullName)}</p>
             <p class="sub">${escapeHtml(p.role)}${p.subunit ? ` <span class="muted">· ${escapeHtml(p.subunit)}</span>` : ""}</p>
             <div class="tag">${escapeHtml((p.topics||[]).slice(0,3).join(" · ") || "—")}</div>
@@ -261,9 +228,10 @@ function renderPerson(deptHashId, personId){
 
   crumbsEl.textContent = `/ Отделы / ${dept.name} / ${p.fullName}`;
   backBtn.style.display = "inline-block";
-  backBtn.onclick = () => setHash(`/dept/${encodeURIComponent(dept.id)}`);
+  backBtn.onclick = () => setHash(`dept/${encodeURIComponent(dept.id)}`);
 
   const topics = (p.topics || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join(" ");
+
   viewEl.innerHTML = `
     <div class="two">
       <div class="panel">
@@ -275,6 +243,7 @@ function renderPerson(deptHashId, personId){
           <div><div class="k">Корп.</div><div class="v">${p.phoneCorp ? `<a href="tel:${escapeHtml(p.phoneCorp)}">${escapeHtml(p.phoneCorp)}</a>` : "—"}</div></div>
           <div><div class="k">Личный</div><div class="v">${p.phonePersonal ? `<a href="tel:${escapeHtml(p.phonePersonal)}">${escapeHtml(p.phonePersonal)}</a>` : "—"}</div></div>
           <div><div class="k">Локация</div><div class="v">${escapeHtml(p.location || "—")}</div></div>
+          <div><div class="k">Добавочный номер</div><div class="v">${escapeHtml(p.extension || "—")}</div></div>
         </div>
       </div>
 
@@ -295,16 +264,15 @@ function render(){
   if(parts.length === 1 && parts[0] === "departments"){ renderDepartments(q); return; }
   if(parts.length === 2 && parts[0] === "dept"){ renderDept(parts[1], q); return; }
   if(parts.length === 3 && parts[0] === "person"){ renderPerson(parts[1], parts[2]); return; }
-  setHash("/departments");
+
+  setHash("departments");
 }
 
-homeBtn.onclick = () => setHash("/departments");
+homeBtn.onclick = () => setHash("departments");
 searchEl.addEventListener("input", () => render());
 clearSearchBtn.onclick = () => { searchEl.value = ""; render(); };
 window.addEventListener("hashchange", () => render());
 
-if(!location.hash) setHash("/departments");
+if(!location.hash) setHash("departments");
 loadCSV();
 </script>
-</body>
-</html>
