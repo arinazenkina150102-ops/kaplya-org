@@ -5,27 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Оргструктура — Капля</title>
 
-  <!-- Подключаем Bootstrap -->
+  <!-- Подключаем Bootstrap для стилей -->
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-  
+
   <!-- Дополнительные стили -->
   <style>
-    /* Цвета */
     :root {
-      --bg-color: #f4f7fc;  /* Светлый фон */
-      --primary-color: #003d73;  /* Синий для основного */
-      --secondary-color: #f0f4f8;  /* Очень светлый фон */
-      --text-color: #333;  /* Тёмный текст */
+      --primary-color: #003d73;  /* Основной синий */
       --accent-color: #ff5c5c;  /* Красный для акцентов */
-      --gold-color: #d6a13f;  /* Золотистый для выделений */
-      --button-color: #003d73;  /* Синий для кнопок */
+      --bg-color: #f4f7fc;  /* Светлый фон */
+      --text-color: #333;  /* Тёмный текст */
+      --secondary-color: #fff;  /* Белый фон */
     }
 
     /* Основной фон и шрифты */
     body {
       background-color: var(--bg-color);
       color: var(--text-color);
-      font-family: 'Arial', sans-serif;
+      font-family: Arial, sans-serif;
     }
 
     header {
@@ -71,14 +68,14 @@
     }
 
     .card .tag {
-      background-color: var(--gold-color);
+      background-color: var(--accent-color);
       color: var(--secondary-color);
       padding: 5px 10px;
       border-radius: 10px;
     }
 
     button {
-      background-color: var(--button-color);
+      background-color: var(--primary-color);
       color: var(--secondary-color);
       padding: 10px 20px;
       border: none;
@@ -95,10 +92,10 @@
       background-color: #dc3545;
       color: var(--secondary-color);
     }
+
     #clearSearch:hover {
       background-color: #c82333;
     }
-
   </style>
 </head>
 
@@ -128,7 +125,6 @@
 
   <!-- Подключаем JavaScript -->
   <script>
-    // Твой JS код
     const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT0X2z7-H5MM3arEVrYh0wuBiNfpphFa3ebyXu8KouT48l2egq-kctEXDCFtUbGVg/pub?gid=1412005436&single=true&output=csv";
 
     const viewEl = document.getElementById("view");
@@ -294,9 +290,11 @@
         <div class="grid">
           ${list.map(d => `
             <div class="card" onclick="setHash('dept/${encodeURIComponent(d.id)}')">
-              <p class="title">${escapeHtml(d.name)}</p>
-              <p class="sub">${escapeHtml(d.description || " ")}</p>
-              <span class="tag">Сотрудников: ${d.people.length}</span>
+              <div class="card-body">
+                <h5 class="card-title">${escapeHtml(d.name)}</h5>
+                <p class="card-text">${escapeHtml(d.description || " ")}</p>
+                <span class="badge badge-primary">Сотрудников: ${d.people.length}</span>
+              </div>
             </div>
           `).join("")}
         </div>
@@ -308,9 +306,6 @@
       const q = searchEl.value || "";
 
       if(parts.length === 1 && parts[0] === "departments"){ renderDepartments(q); return; }
-      if(parts.length === 2 && parts[0] === "dept"){ renderDept(parts[1], q); return; }
-      if(parts.length === 3 && parts[0] === "person"){ renderPerson(parts[1], parts[2]); return; }
-
       setHash("departments");
     }
 
@@ -322,7 +317,6 @@
     if(!location.hash) setHash("departments");
     loadCSV();
   </script>
+
 </body>
 </html>
-
-
